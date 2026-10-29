@@ -1,0 +1,18 @@
+# Python Cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Android Build artifacts
+android_app/build/
+android_app/debug.keystore
+*.idsig
+
+# Downloaded Games & Temporary Files
+*-v*/
+*.part
+completed_links.txt
+
+# IDE & Editor
+.vscode/
+.idea/

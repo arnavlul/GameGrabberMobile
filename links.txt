@@ -1,0 +1,17 @@
+# ==============================================================================
+# GameGrabberMobile - Input Links File
+# ==============================================================================
+# Add one game URL per line below.
+# Lines starting with '#' and blank lines are ignored.
+#
+# Supported formats:
+# 1. Direct game CDN / embed URLs:
+#    https://game-cdn.example.com/games/adventure/index.html
+#
+# 2. Game portal URLs:
+#    https://game-portal.com/games/space-quest
+#
+# ==============================================================================
+
+# Paste your game links below:
+# https://game-portal.com/games/my-game

@@ -1,0 +1,239 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:background="#0F172A">
+
+    <!-- Header -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="GameGrabber Mobile"
+        android:textColor="#38BDF8"
+        android:textSize="22sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="12dp"
+        android:text="Universal Offline HTML Game Downloader"
+        android:textColor="#94A3B8"
+        android:textSize="12sp" />
+
+    <!-- Links Input -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Paste Game Links (one per line):"
+        android:textColor="#F8FAFC"
+        android:textSize="14sp"
+        android:textStyle="bold" />
+
+    <EditText
+        android:id="@+id/edit_links"
+        android:layout_width="match_parent"
+        android:layout_height="100dp"
+        android:gravity="top|start"
+        android:hint="https://game-portal.com/games/my-game\nhttps://game-cdn.example.com/index.html"
+        android:inputType="textMultiLine"
+        android:background="#1E293B"
+        android:textColor="#F8FAFC"
+        android:textColorHint="#64748B"
+        android:padding="10dp"
+        android:scrollbars="vertical"
+        android:textSize="13sp" />
+
+    <!-- Quick Action Buttons -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="6dp"
+        android:layout_marginBottom="10dp">
+
+        <Button
+            android:id="@+id/btn_paste"
+            android:layout_width="0dp"
+            android:layout_height="36dp"
+            android:layout_weight="1"
+            android:text="Paste Link"
+            android:textSize="12sp"
+            android:textColor="#F8FAFC"
+            android:background="#334155" />
+
+        <Space
+            android:layout_width="8dp"
+            android:layout_height="wrap_content" />
+
+        <Button
+            android:id="@+id/btn_clear"
+            android:layout_width="0dp"
+            android:layout_height="36dp"
+            android:layout_weight="1"
+            android:text="Clear"
+            android:textSize="12sp"
+            android:textColor="#F8FAFC"
+            android:background="#334155" />
+    </LinearLayout>
+
+    <!-- Options Row -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <CheckBox
+            android:id="@+id/chk_skip_videos"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Skip Videos"
+            android:textColor="#F8FAFC"
+            android:textSize="12sp" />
+
+        <CheckBox
+            android:id="@+id/chk_ssl_bypass"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:checked="true"
+            android:text="SSL Bypass"
+            android:textColor="#F8FAFC"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <!-- Data Limit & Threads Row -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginBottom="10dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Limit (MB): "
+            android:textColor="#94A3B8"
+            android:textSize="12sp" />
+
+        <EditText
+            android:id="@+id/edit_limit_mb"
+            android:layout_width="0dp"
+            android:layout_height="36dp"
+            android:layout_weight="1"
+            android:background="#1E293B"
+            android:hint="Unlimited"
+            android:inputType="number"
+            android:textColor="#F8FAFC"
+            android:textColorHint="#64748B"
+            android:padding="6dp"
+            android:textSize="12sp" />
+
+        <Space
+            android:layout_width="12dp"
+            android:layout_height="wrap_content" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Threads: "
+            android:textColor="#94A3B8"
+            android:textSize="12sp" />
+
+        <EditText
+            android:id="@+id/edit_threads"
+            android:layout_width="50dp"
+            android:layout_height="36dp"
+            android:background="#1E293B"
+            android:text="4"
+            android:inputType="number"
+            android:textColor="#F8FAFC"
+            android:padding="6dp"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <!-- Download & Stop Controls -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginBottom="12dp">
+
+        <Button
+            android:id="@+id/btn_download"
+            android:layout_width="0dp"
+            android:layout_height="44dp"
+            android:layout_weight="2"
+            android:text="START DOWNLOAD"
+            android:textColor="#FFFFFF"
+            android:textStyle="bold"
+            android:background="#10B981" />
+
+        <Space
+            android:layout_width="8dp"
+            android:layout_height="wrap_content" />
+
+        <Button
+            android:id="@+id/btn_stop"
+            android:layout_width="0dp"
+            android:layout_height="44dp"
+            android:layout_weight="1"
+            android:text="STOP"
+            android:textColor="#FFFFFF"
+            android:textStyle="bold"
+            android:background="#EF4444"
+            android:enabled="false" />
+    </LinearLayout>
+
+    <!-- Progress & Status -->
+    <TextView
+        android:id="@+id/txt_status"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Status: Ready"
+        android:textColor="#38BDF8"
+        android:textSize="13sp"
+        android:textStyle="bold" />
+
+    <ProgressBar
+        android:id="@+id/progress_bar"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="8dp"
+        android:layout_marginTop="4dp"
+        android:layout_marginBottom="4dp"
+        android:max="100"
+        android:progress="0" />
+
+    <TextView
+        android:id="@+id/txt_counter"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="8dp"
+        android:text="0 / 0 files (0 MB)"
+        android:textColor="#94A3B8"
+        android:textSize="12sp" />
+
+    <!-- Terminal Console Log -->
+    <ScrollView
+        android:id="@+id/scroll_log"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="#020617"
+        android:padding="8dp">
+
+        <TextView
+            android:id="@+id/txt_log"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:fontFamily="monospace"
+            android:text="[Ready] Enter links above and tap START DOWNLOAD.\nSaved games will be stored in Downloads/GameGrabber/"
+            android:textColor="#4ADE80"
+            android:textSize="11sp" />
+    </ScrollView>
+
+</LinearLayout>
