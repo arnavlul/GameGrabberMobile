@@ -1,20 +1,29 @@
 # GameGrabberMobile 📱
 
+[![Latest Release](https://img.shields.io/github/v/release/arnavlul/GameGrabberMobile?label=Latest%20Release&color=38BDF8)](https://github.com/arnavlul/GameGrabberMobile/releases/latest)
+[![Download APK](https://img.shields.io/badge/Download-GameGrabber.apk%20(~45KB)-10B981?style=for-the-badge&logo=android&logoColor=white)](https://github.com/arnavlul/GameGrabberMobile/releases/latest/download/GameGrabber.apk)
+
 Universal offline web game downloader for Android (Native APK & Python CLI). Download and preserve HTML, Twine, and browser games directly on mobile devices with batch URL processing, HTTP Range resuming, and zero heavy browser dependencies.
 
 ---
 
-## 📦 What's Included
+## 📦 Download & Installation
 
-1. **[`GameGrabber.apk`](GameGrabber.apk) (~45 KB)**
-   - **Native Android Application** (compatible with Android 5.0 through Android 15/16).
-   - Lightweight, zero bloat, native Dalvik/ART bytecode.
-   - Built-in multi-threaded downloader, HTTP Range resume (`.part`), self-healing filter, and automatic portal/iframe resolver.
-   - Saves directly to your phone's `Downloads/GameGrabber/` folder.
+### Option 1: Native Android App (Recommended)
+👉 **[Download GameGrabber.apk (Latest v1.0.0)](https://github.com/arnavlul/GameGrabberMobile/releases/latest/download/GameGrabber.apk)**
+1. Tap the download link on your phone.
+2. Open the downloaded `GameGrabber.apk` and tap **Install**.
+3. Open the app, paste your links, and download games straight to `Downloads/GameGrabber/`!
 
-2. **[`grabber.py`](grabber.py)**
-   - Pure Python alternative for mobile terminal environments (**Termux**, **Pydroid 3**) or PC.
-   - Reads batch URLs directly from **`links.txt`**.
+### Option 2: Python CLI (Termux / PC)
+For running via Termux on Android or from terminal:
+```bash
+pkg update && pkg install python git
+git clone https://github.com/arnavlul/GameGrabberMobile.git
+cd GameGrabberMobile
+pip install -r requirements.txt
+python grabber.py
+```
 
 ---
 
