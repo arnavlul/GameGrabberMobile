@@ -126,7 +126,7 @@ def normalize_base_game_url(url):
 def encode_url_path(rel_path):
     """Encodes relative asset path while keeping slashes and standard safe path characters intact."""
     decoded = unquote(rel_path.replace("+", "%2B"))
-    return quote(decoded, safe="/()'!~,-_.")
+    return quote(decoded, safe="/()'!~,-_.@")
 
 # ==============================================================================
 # PORTAL & IFRAME RESOLVER
@@ -157,9 +157,22 @@ class PortalResolver:
             lower_html = page_html.lower()
             if any(sig in lower_html for sig in [
                 "<tw-storydata", "sugarcube", 'id="store-area"', 'id="storearea"',
+                "tiddler=", "renpy.js", "renpy.wasm", "game.zip",
                 "c2runtime.js", "c3runtime.js", "rpg_core.js", "rmmz_core.js"
             ]):
                 return final_url, p_title, p_ver, page_html
+
+            # Check for <meta http-equiv="refresh" content="...url=...">
+            m_ref = re.search(r'<meta[^>]+http-equiv=[\'"]?refresh[\'"]?[^>]+content=[\'"]?[^\'"]*url=([^\'"\s>]+)', page_html, re.I)
+            if m_ref:
+                redir_url = urljoin(final_url, html.unescape(m_ref.group(1)).strip())
+                return PortalResolver.resolve(session, redir_url, timeout)
+
+            # Check for window.location = "..."
+            m_js = re.search(r'(?:window\.)?location(?:\.href)?\s*=\s*[\'"]([^\'"]+\.(?:html?|php)[^\'"]*)[\'"]', page_html, re.I)
+            if m_js:
+                js_url = urljoin(final_url, html.unescape(m_js.group(1)).strip())
+                return PortalResolver.resolve(session, js_url, timeout)
 
             soup = BeautifulSoup(page_html, "html.parser")
 
@@ -215,7 +228,7 @@ def sanitize_filename(name):
     """Sanitizes strings for safe cross-platform folder/file names."""
     name = re.sub(r'[\\/*?:"<>|]', "", name)
     name = re.sub(r'[\r\n\t]+', " ", name)
-    name = re.sub(r'\s+', " ", name).strip(" -_")
+    name = re.sub(r'\s+', " ", name).strip(" -_.")
     return name
 
 def extract_game_metadata(html_content, fallback_url, portal_title=None, portal_version=None):
@@ -507,6 +520,42 @@ class HTMLAssetExtractor:
                     add_ref(img)
                 for vid in p_vids:
                     add_ref(vid)
+        else:
+            # Twine 1 format (Sugarcane / Jonah / Responsive): <div tiddler="...">...</div>
+            for tm in re.finditer(r'<div[^>]+tiddler=[\'"]([^\'"]+)[\'"][^>]*>(.*?)</div>', html_content, re.I | re.DOTALL):
+                p_text = html.unescape(tm.group(2))
+                for m in re.finditer(r'(?:src|href|poster|archive|data-src)\s*=\s*["\']([^"\']+)["\']', p_text, re.I):
+                    add_ref(m.group(1))
+                for raw in re.findall(r'\[img\[(.*?)\]\]', p_text, re.I):
+                    first_block = raw.split('][')[0]
+                    if '|' in first_block:
+                        first_block = first_block.split('|', 1)[1]
+                    add_ref(first_block)
+
+        # Ren'Py Web engine assets
+        lower_html_full = html_content.lower()
+        if "renpy" in lower_html_full or "game.zip" in lower_html_full:
+            renpy_files = [
+                "game.zip", "game.zip.001", "game.zip.002",
+                "renpy.js", "renpy-pre.js", "renpy.wasm", "renpy.data",
+                "pyapp-data.js", "pythonhome-data.js",
+                "package.json", "progressive_download.txt",
+                "web-presplash.png", "web-presplash.jpg",
+                "renpy.png", "icons/icon-192x192.png", "icons/icon-512x512.png"
+            ]
+            for rf in renpy_files:
+                add_ref(rf)
+
+        # RPG Maker MV/MZ engine assets
+        if any(kw in lower_html_full for kw in ["rpg_core.js", "rmmz_core.js", "data/system.json"]):
+            rpg_data = [
+                "data/System.json", "data/Actors.json", "data/Classes.json", "data/Skills.json",
+                "data/Items.json", "data/Weapons.json", "data/Armors.json", "data/Enemies.json",
+                "data/Troops.json", "data/States.json", "data/Animations.json", "data/Tilesets.json",
+                "data/CommonEvents.json", "data/MapInfos.json", "js/plugins.js"
+            ]
+            for rdf in rpg_data:
+                add_ref(rdf)
 
         # 3. Global scan across full unescaped HTML
         HTMLAssetExtractor.extract_from_secondary_text(unescaped_html, add_ref)
@@ -646,7 +695,15 @@ class DownloadWorker:
                         expected_total = content_len
                 elif code == 206:
                     mode = "ab"
-                    if content_len > 0:
+                    cr = resp.headers.get("Content-Range", "")
+                    if "/" in cr:
+                        try:
+                            cr_total = int(cr.rsplit("/", 1)[1].strip())
+                            if cr_total > 0:
+                                expected_total = cr_total
+                        except Exception:
+                            pass
+                    if expected_total <= 0 and content_len > 0:
                         expected_total = existing_size + content_len
                 elif code == 416:
                     if os.path.exists(part_path) and not self.is_corrupt(part_path):

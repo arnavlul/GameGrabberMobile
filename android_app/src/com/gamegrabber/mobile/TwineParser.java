@@ -157,7 +157,7 @@ public class TwineParser {
             version = "v1.0";
         }
 
-        cleanTitle = cleanTitle.replaceAll("[\\\\/*?:\"<>|]", "").replaceAll("^[-_\\s]+|[-_\\s]+$", "").trim();
+        cleanTitle = cleanTitle.replaceAll("[\\\\/*?:\"<>|]", "").replaceAll("^[-_\\s.]+|[-_\\s.]+$", "").trim();
         if (cleanTitle.isEmpty() || cleanTitle.equalsIgnoreCase("untitled") || cleanTitle.equalsIgnoreCase("untitled game")
                 || cleanTitle.equalsIgnoreCase("gamcore") || cleanTitle.equalsIgnoreCase("game") || cleanTitle.equalsIgnoreCase("index")) {
             String[] parts = fallbackUrl.split("\\?")[0].replaceAll("/+$", "").split("/");
@@ -484,6 +484,51 @@ public class TwineParser {
                 for (String img : pImgs) addRef.accept(img);
                 for (String vid : pVids) addRef.accept(vid);
             }
+        } else {
+            // Twine 1 format (Sugarcane / Jonah / Responsive): <div tiddler="...">...</div>
+            Pattern tiddlerPat = Pattern.compile("<div[^>]+tiddler=[\"']([^\"']+)[\"'][^>]*>(.*?)</div>", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+            Matcher tm = tiddlerPat.matcher(html);
+            while (tm.find()) {
+                String pText = unescapeHtml(tm.group(2));
+                Matcher attrMat = Pattern.compile("(?:src|href|poster|archive|data-src)\\s*=\\s*[\"']([^\"']+)[\"']", Pattern.CASE_INSENSITIVE).matcher(pText);
+                while (attrMat.find()) addRef.accept(attrMat.group(1));
+
+                Matcher imMat = Pattern.compile("\\[img\\[(.*?)\\]\\]", Pattern.CASE_INSENSITIVE).matcher(pText);
+                while (imMat.find()) {
+                    String raw = imMat.group(1).split("\\]\\[")[0];
+                    if (raw.contains("|")) raw = raw.substring(raw.indexOf('|') + 1);
+                    addRef.accept(raw);
+                }
+            }
+        }
+
+        // Ren'Py Web engine assets
+        String lowerHtmlFull = html.toLowerCase();
+        if (lowerHtmlFull.contains("renpy") || lowerHtmlFull.contains("game.zip")) {
+            String[] renpyFiles = new String[]{
+                "game.zip", "game.zip.001", "game.zip.002",
+                "renpy.js", "renpy-pre.js", "renpy.wasm", "renpy.data",
+                "pyapp-data.js", "pythonhome-data.js",
+                "package.json", "progressive_download.txt",
+                "web-presplash.png", "web-presplash.jpg",
+                "renpy.png", "icons/icon-192x192.png", "icons/icon-512x512.png"
+            };
+            for (String rf : renpyFiles) {
+                addRef.accept(rf);
+            }
+        }
+
+        // RPG Maker MV/MZ engine assets
+        if (lowerHtmlFull.contains("rpg_core.js") || lowerHtmlFull.contains("rmmz_core.js") || lowerHtmlFull.contains("data/system.json")) {
+            String[] rpgData = new String[]{
+                "data/System.json", "data/Actors.json", "data/Classes.json", "data/Skills.json",
+                "data/Items.json", "data/Weapons.json", "data/Armors.json", "data/Enemies.json",
+                "data/Troops.json", "data/States.json", "data/Animations.json", "data/Tilesets.json",
+                "data/CommonEvents.json", "data/MapInfos.json", "js/plugins.js"
+            };
+            for (String rdf : rpgData) {
+                addRef.accept(rdf);
+            }
         }
 
         // 3. Global scan across full unescaped HTML for any remaining tags, CSS url(), or quoted asset paths
@@ -527,6 +572,25 @@ public class TwineParser {
         Matcher pathMat = Pattern.compile("[\"']((?:Images|Videos|Audio|Sounds|Music|Media|Movies|Assets|img|video|videos|audio|sounds|music|media|assets|data|fonts|css|js|scripts)/[^\"'<>\\r\\n]+?\\.[a-zA-Z0-9]{2,5})[\"']", Pattern.CASE_INSENSITIVE).matcher(unescapedContent);
         while (pathMat.find()) {
             addRef.accept(pathMat.group(1));
+        }
+
+        // Ren'Py package.json parsing ("files": [...])
+        if (unescapedContent.contains("\"files\"")) {
+            Matcher pkgMat = Pattern.compile("\"([^\"]+?\\.[a-zA-Z0-9]{2,5})\"").matcher(unescapedContent);
+            while (pkgMat.find()) {
+                addRef.accept(pkgMat.group(1));
+            }
+        }
+
+        // Ren'Py progressive_download.txt line parsing
+        if (unescapedContent.contains(".opus") || unescapedContent.contains(".ogg") || unescapedContent.contains(".png")) {
+            String[] lines = unescapedContent.split("[\\r\\n]+");
+            for (String l : lines) {
+                String cl = l.trim().split("#")[0].trim();
+                if (!cl.isEmpty() && cl.contains(".") && !cl.contains(" ")) {
+                    addRef.accept(cl);
+                }
+            }
         }
     }
 }

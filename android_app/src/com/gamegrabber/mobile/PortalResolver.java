@@ -161,6 +161,8 @@ public class PortalResolver {
                 String lowerHtml = htmlStr.toLowerCase();
                 if (lowerHtml.contains("<tw-storydata") || lowerHtml.contains("sugarcube") ||
                     lowerHtml.contains("id=\"store-area\"") || lowerHtml.contains("id=\"storearea\"") ||
+                    lowerHtml.contains("tiddler=") || lowerHtml.contains("renpy.js") ||
+                    lowerHtml.contains("renpy.wasm") || lowerHtml.contains("game.zip") ||
                     lowerHtml.contains("c2runtime.js") || lowerHtml.contains("c3runtime.js") ||
                     lowerHtml.contains("rpg_core.js") || lowerHtml.contains("rmmz_core.js")) {
                     return new PortalResult(finalUrl, portalMeta.title, portalMeta.version, htmlStr);
@@ -168,7 +170,29 @@ public class PortalResolver {
 
                 URL baseUrlObj = new URL(finalUrl);
 
-                // 2. Search for game iframes / embeds
+                // 2. Search for <meta http-equiv="refresh" content="...url=...">
+                Pattern metaRefreshPat = Pattern.compile("<meta[^>]+http-equiv=[\"']?refresh[\"']?[^>]+content=[\"']?[^\"'>]*url=([^\"'>\\s]+)", Pattern.CASE_INSENSITIVE);
+                Matcher mRef = metaRefreshPat.matcher(htmlStr);
+                if (mRef.find()) {
+                    String redirUrl = TwineParser.unescapeHtml(mRef.group(1)).trim();
+                    try {
+                        String resolvedRedir = new URL(baseUrlObj, redirUrl).toString();
+                        return resolve(resolvedRedir, sslBypass);
+                    } catch (Exception ignored) {}
+                }
+
+                // 3. Search for window.location = "..." or location.href = "..."
+                Pattern jsRedirPat = Pattern.compile("(?:window\\.)?location(?:\\.href)?\\s*=\\s*[\"']([^\"']+\\.(?:html?|php)[^\"']*)[\"']", Pattern.CASE_INSENSITIVE);
+                Matcher mJs = jsRedirPat.matcher(htmlStr);
+                if (mJs.find()) {
+                    String jsTarget = TwineParser.unescapeHtml(mJs.group(1)).trim();
+                    try {
+                        String resolvedJs = new URL(baseUrlObj, jsTarget).toString();
+                        return resolve(resolvedJs, sslBypass);
+                    } catch (Exception ignored) {}
+                }
+
+                // 4. Search for game iframes / embeds
                 Pattern iframePattern = Pattern.compile("<(?:iframe|embed|frame)[^>]+(?:src|data-src|data-lazy-src)\\s*=\\s*[\"']([^\"']+)[\"']", Pattern.CASE_INSENSITIVE);
                 Matcher m = iframePattern.matcher(htmlStr);
                 List<String> candidates = new ArrayList<>();

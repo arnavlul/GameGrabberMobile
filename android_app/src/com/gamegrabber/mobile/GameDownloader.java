@@ -109,7 +109,8 @@ public class GameDownloader {
                     .replace("%27", "'")
                     .replace("%21", "!")
                     .replace("%2C", ",")
-                    .replace("%7E", "~");
+                    .replace("%7E", "~")
+                    .replace("%40", "@");
                 sb.append(encoded);
             }
             return sb.toString();
@@ -187,7 +188,17 @@ public class GameDownloader {
 
                 if (code == 206) {
                     append = true;
-                    if (contentLen > 0) {
+                    String cr = conn.getHeaderField("Content-Range");
+                    if (cr != null && cr.contains("/")) {
+                        try {
+                            String totalStr = cr.substring(cr.lastIndexOf('/') + 1).trim();
+                            long crTotal = Long.parseLong(totalStr);
+                            if (crTotal > 0) {
+                                expectedTotalSize = crTotal;
+                            }
+                        } catch (Exception ignored) {}
+                    }
+                    if (expectedTotalSize <= 0 && contentLen > 0) {
                         expectedTotalSize = existingSize + contentLen;
                     }
                 } else if (code == 200) {
