@@ -13,6 +13,7 @@ downloads/
 *-v*/
 *.part
 completed_links.txt
+todo.md
 
 # IDE & Editor
 .vscode/
