@@ -654,6 +654,13 @@ class DownloadWorker:
             return (rel_path, True, "Skipped (video)")
 
         local_path = os.path.join(self.target_folder, os.path.normpath(rel_path))
+        canonical_target = os.path.abspath(self.target_folder)
+        canonical_local = os.path.abspath(local_path)
+        if not canonical_local.startswith(canonical_target + os.sep):
+            if pbar:
+                pbar.update(1)
+            return (rel_path, False, "Path traversal rejected")
+
         part_path = local_path + ".part"
 
         if os.path.exists(local_path):

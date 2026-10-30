@@ -151,6 +151,17 @@ public class GameDownloader {
         }
 
         File localFile = new File(targetFolder, rel.replace('/', File.separatorChar));
+        try {
+            String targetPath = targetFolder.getCanonicalPath();
+            String localPath = localFile.getCanonicalPath();
+            if (!localPath.startsWith(targetPath + File.separator)) {
+                listener.onLog("[SECURITY] Path traversal rejected: " + rel);
+                return false;
+            }
+        } catch (Exception e) {
+            return false;
+        }
+
         File partFile = new File(localFile.getAbsolutePath() + ".part");
 
         if (localFile.exists() && !isCorrupt(localFile)) {
@@ -170,6 +181,7 @@ public class GameDownloader {
 
             long existingSize = partFile.exists() ? partFile.length() : 0;
             HttpURLConnection conn = null;
+            boolean downloadOk = false;
             try {
                 URL downloadUrl = new URL(new URL(baseUrl), encodeUrlPath(rel));
                 Map<String, String> extraHeaders = new HashMap<>();
@@ -211,6 +223,7 @@ public class GameDownloader {
                     // Range not satisfiable: .part file is already complete
                     if (partFile.exists() && !isCorrupt(partFile)) {
                         safeRename(partFile, localFile);
+                        downloadOk = true;
                         return true;
                     } else if (partFile.exists()) {
                         partFile.delete();
@@ -223,8 +236,10 @@ public class GameDownloader {
                     throw new IOException("HTTP " + code);
                 }
 
-                try (InputStream in = conn.getInputStream();
-                     FileOutputStream fos = new FileOutputStream(partFile, append)) {
+                try (InputStream rawIn = conn.getInputStream();
+                     BufferedInputStream in = new BufferedInputStream(rawIn, 65536);
+                     FileOutputStream rawFos = new FileOutputStream(partFile, append);
+                     BufferedOutputStream fos = new BufferedOutputStream(rawFos, 65536)) {
                     byte[] buffer = new byte[65536];
                     int bytesRead;
                     while ((bytesRead = in.read(buffer)) != -1) {
@@ -254,6 +269,7 @@ public class GameDownloader {
                 if (partFile.exists()) {
                     if (!isCorrupt(partFile)) {
                         if (safeRename(partFile, localFile)) {
+                            downloadOk = true;
                             return true;
                         }
                     } else {
@@ -273,8 +289,8 @@ public class GameDownloader {
                     }
                 }
             } finally {
-                if (conn != null) {
-                    conn.disconnect();
+                if (conn != null && !downloadOk) {
+                    try { conn.disconnect(); } catch (Exception ignored) {}
                 }
             }
         }

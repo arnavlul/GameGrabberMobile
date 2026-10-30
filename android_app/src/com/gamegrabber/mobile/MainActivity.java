@@ -34,6 +34,7 @@ public class MainActivity extends Activity {
     private ExecutorService mainExecutor;
     private volatile GameDownloader currentDownloader;
     private volatile boolean isRunning = false;
+    private final java.util.concurrent.atomic.AtomicInteger currentRunId = new java.util.concurrent.atomic.AtomicInteger(0);
     private PowerManager.WakeLock wakeLock;
 
     private final LinkedList<String> logLines = new LinkedList<>();
@@ -279,10 +280,12 @@ public class MainActivity extends Activity {
 
         final long fTotalLimitBytes = limitBytes;
         final int fThreads = Math.max(1, Math.min(threads, 12));
+        final int runId = currentRunId.incrementAndGet();
 
         acquireWakeLock();
 
         mainExecutor.submit(() -> {
+            if (currentRunId.get() != runId) return;
             int jobsSucceeded = 0;
             AtomicLong batchBytesDownloaded = new AtomicLong(0);
 
@@ -291,7 +294,7 @@ public class MainActivity extends Activity {
                 appendLog("[*] Storage directory: " + baseStorage.getAbsolutePath());
 
                 for (int i = 0; i < urls.size(); i++) {
-                    if (!isRunning) break;
+                    if (!isRunning || currentRunId.get() != runId) break;
 
                     // Check if overall batch data limit reached
                     long usedBytes = batchBytesDownloaded.get();
@@ -306,7 +309,11 @@ public class MainActivity extends Activity {
 
                     String url = urls.get(i);
                     final int jobNum = i + 1;
-                    runOnUiThread(() -> txtStatus.setText("Status: Job " + jobNum + "/" + urls.size() + " resolving..."));
+                    runOnUiThread(() -> {
+                        if (currentRunId.get() == runId) {
+                            txtStatus.setText("Status: Job " + jobNum + "/" + urls.size() + " resolving...");
+                        }
+                    });
                     appendLog("\n=============================================");
                     appendLog("[*] Job (" + jobNum + "/" + urls.size() + "): " + url);
 
@@ -417,21 +424,24 @@ public class MainActivity extends Activity {
                 final int finalSucceeded = jobsSucceeded;
                 final int totalJobs = urls.size();
                 runOnUiThread(() -> {
-                    isRunning = false;
-                    btnDownload.setEnabled(true);
-                    btnStop.setEnabled(false);
-                    if (finalSucceeded == totalJobs) {
-                        txtStatus.setText("Status: All " + totalJobs + " Game(s) Verified & Complete!");
-                    } else {
-                        txtStatus.setText("Status: " + finalSucceeded + "/" + totalJobs + " Complete (Tap START to resume)");
+                    if (currentRunId.get() == runId) {
+                        isRunning = false;
+                        btnDownload.setEnabled(true);
+                        btnStop.setEnabled(false);
+                        if (finalSucceeded == totalJobs) {
+                            txtStatus.setText("Status: All " + totalJobs + " Game(s) Verified & Complete!");
+                        } else {
+                            txtStatus.setText("Status: " + finalSucceeded + "/" + totalJobs + " Complete (Tap START to resume)");
+                        }
+                        appendLog("\n[*] Queue finished: " + finalSucceeded + "/" + totalJobs + " games completely verified.");
                     }
-                    appendLog("\n[*] Queue finished: " + finalSucceeded + "/" + totalJobs + " games completely verified.");
                 });
             }
         });
     }
 
     private void stopDownload() {
+        currentRunId.incrementAndGet();
         isRunning = false;
         if (currentDownloader != null) {
             currentDownloader.stop();
