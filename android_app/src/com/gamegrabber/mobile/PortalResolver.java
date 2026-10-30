@@ -1,18 +1,23 @@
 package com.gamegrabber.mobile;
 
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
+import java.net.InetAddress;
+import java.net.Socket;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
 
@@ -41,25 +46,132 @@ public class PortalResolver {
         }
     }
 
+    public static String sanitizeHost(String host) {
+        if (host == null || host.isEmpty()) return host;
+        String lower = host.toLowerCase(Locale.US);
+
+        if (lower.endsWith(".fgn.cdn.serverable.com") || lower.endsWith(".serverable.com")) {
+            return "fgn.cdn.serverable.com";
+        }
+        if (lower.endsWith(".discretehosting.com")) {
+            return "discretehosting.com";
+        }
+
+        // If host has characters that violate RFC 1123 / IDN rules (like underscores)
+        if (host.contains("_")) {
+            return host.replace('_', '-');
+        }
+
+        return host;
+    }
+
+    public static String sanitizeUrl(String urlStr) {
+        if (urlStr == null) return "";
+        urlStr = urlStr.trim();
+        if (urlStr.isEmpty()) return "";
+
+        urlStr = urlStr.replaceAll("^['\"]+|['\"]+$", "");
+        if (urlStr.startsWith("//")) {
+            urlStr = "https:" + urlStr;
+        }
+
+        try {
+            URL u = new URL(urlStr);
+            String host = u.getHost();
+            if (host == null || host.isEmpty()) {
+                return urlStr;
+            }
+
+            String safeHost = sanitizeHost(host);
+            if (safeHost.equals(host)) {
+                return urlStr;
+            }
+
+            int port = u.getPort();
+            String portPart = (port != -1 && port != u.getDefaultPort()) ? ":" + port : "";
+            String file = u.getFile();
+            return u.getProtocol() + "://" + safeHost + portPart + file;
+        } catch (Exception e) {
+            return urlStr;
+        }
+    }
+
+    public static class SafeSSLSocketFactory extends SSLSocketFactory {
+        private final SSLSocketFactory delegate;
+
+        public SafeSSLSocketFactory(SSLSocketFactory delegate) {
+            this.delegate = delegate;
+        }
+
+        @Override
+        public String[] getDefaultCipherSuites() {
+            return delegate.getDefaultCipherSuites();
+        }
+
+        @Override
+        public String[] getSupportedCipherSuites() {
+            return delegate.getSupportedCipherSuites();
+        }
+
+        @Override
+        public Socket createSocket(Socket s, String host, int port, boolean autoClose) throws IOException {
+            return delegate.createSocket(s, sanitizeHost(host), port, autoClose);
+        }
+
+        @Override
+        public Socket createSocket(String host, int port) throws IOException {
+            return delegate.createSocket(sanitizeHost(host), port);
+        }
+
+        @Override
+        public Socket createSocket(String host, int port, InetAddress localHost, int localPort) throws IOException {
+            return delegate.createSocket(sanitizeHost(host), port, localHost, localPort);
+        }
+
+        @Override
+        public Socket createSocket(InetAddress host, int port) throws IOException {
+            return delegate.createSocket(host, port);
+        }
+
+        @Override
+        public Socket createSocket(InetAddress address, int port, InetAddress localAddress, int localPort) throws IOException {
+            return delegate.createSocket(address, port, localAddress, localPort);
+        }
+    }
+
+    private static volatile SafeSSLSocketFactory sSafeFactory = null;
+
+    public static synchronized SafeSSLSocketFactory getSafeSSLSocketFactory() {
+        if (sSafeFactory == null) {
+            try {
+                TrustManager[] trustAllCerts = new TrustManager[]{
+                    new X509TrustManager() {
+                        public X509Certificate[] getAcceptedIssuers() { return new X509Certificate[0]; }
+                        public void checkClientTrusted(X509Certificate[] certs, String authType) {}
+                        public void checkServerTrusted(X509Certificate[] certs, String authType) {}
+                    }
+                };
+                SSLContext sc = SSLContext.getInstance("TLS");
+                sc.init(null, trustAllCerts, new java.security.SecureRandom());
+                sSafeFactory = new SafeSSLSocketFactory(sc.getSocketFactory());
+            } catch (Exception ignored) {}
+        }
+        return sSafeFactory;
+    }
+
     public static void enableSSLBypass() {
         try {
-            TrustManager[] trustAllCerts = new TrustManager[]{
-                new X509TrustManager() {
-                    public X509Certificate[] getAcceptedIssuers() { return new X509Certificate[0]; }
-                    public void checkClientTrusted(X509Certificate[] certs, String authType) {}
-                    public void checkServerTrusted(X509Certificate[] certs, String authType) {}
-                }
-            };
-            SSLContext sc = SSLContext.getInstance("TLS");
-            sc.init(null, trustAllCerts, new java.security.SecureRandom());
-            HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory());
+            SafeSSLSocketFactory factory = getSafeSSLSocketFactory();
+            if (factory != null) {
+                HttpsURLConnection.setDefaultSSLSocketFactory(factory);
+            }
             HttpsURLConnection.setDefaultHostnameVerifier((hostname, session) -> true);
         } catch (Exception ignored) {}
     }
 
     public static String normalizeBaseGameUrl(String url) {
         if (url == null) return "";
-        url = url.trim();
+        url = sanitizeUrl(url.trim());
         String[] qSplit = url.split("\\?", 2);
         String pathPart = qSplit[0];
         String queryPart = qSplit.length > 1 ? "?" + qSplit[1] : "";
@@ -78,14 +190,22 @@ public class PortalResolver {
             }
         } catch (Exception ignored) {}
 
-        return pathPart + queryPart;
+        return sanitizeUrl(pathPart + queryPart);
     }
 
     public static HttpURLConnection openConnectionWithRedirects(String urlStr, String referer, Map<String, String> extraHeaders, int connectTimeoutMs, int readTimeoutMs) throws Exception {
-        String currentUrl = urlStr;
+        String currentUrl = sanitizeUrl(urlStr);
         for (int redirectCount = 0; redirectCount < 6; redirectCount++) {
             URL u = new URL(currentUrl);
             HttpURLConnection conn = (HttpURLConnection) u.openConnection();
+            if (conn instanceof HttpsURLConnection) {
+                HttpsURLConnection httpsConn = (HttpsURLConnection) conn;
+                SafeSSLSocketFactory factory = getSafeSSLSocketFactory();
+                if (factory != null) {
+                    httpsConn.setSSLSocketFactory(factory);
+                }
+                httpsConn.setHostnameVerifier((hostname, session) -> true);
+            }
             conn.setInstanceFollowRedirects(false);
             conn.setRequestMethod("GET");
             conn.setRequestProperty("User-Agent", USER_AGENT);
@@ -109,7 +229,7 @@ public class PortalResolver {
                 if (location == null || location.isEmpty()) {
                     throw new Exception("Redirect (" + code + ") without Location header");
                 }
-                currentUrl = new URL(u, location).toString();
+                currentUrl = sanitizeUrl(new URL(u, location).toString());
                 continue;
             }
             return conn;
@@ -193,7 +313,7 @@ public class PortalResolver {
                 }
 
                 // 4. Search for game iframes / embeds
-                Pattern iframePattern = Pattern.compile("<(?:iframe|embed|frame)[^>]+(?:src|data-src|data-lazy-src)\\s*=\\s*[\"']([^\"']+)[\"']", Pattern.CASE_INSENSITIVE);
+                Pattern iframePattern = Pattern.compile("<(?:iframe|embed|frame)[^>]+(?:src|data-src|data-lazy-src|data-url|data-game-url|data-frame-src)\\s*=\\s*[\"']([^\"']+)[\"']", Pattern.CASE_INSENSITIVE);
                 Matcher m = iframePattern.matcher(htmlStr);
                 List<String> candidates = new ArrayList<>();
 
@@ -204,8 +324,8 @@ public class PortalResolver {
                     }
                     try {
                         URL resolved = new URL(baseUrlObj, src);
-                        String full = resolved.toString();
-                        String lowerFull = full.toLowerCase();
+                        String full = sanitizeUrl(resolved.toString());
+                        String lowerFull = full.toLowerCase(Locale.US);
                         if (lowerFull.contains("fgn.cdn") || lowerFull.contains("serverable") ||
                             lowerFull.contains("discretehosting") || lowerFull.contains("hwcdn.net") ||
                             lowerFull.contains("itch.zone") || lowerFull.contains("ungrounded.net") ||
@@ -217,16 +337,35 @@ public class PortalResolver {
                     } catch (Exception ignored) {}
                 }
 
-                // 3. Search regex inside page source for direct CDN embeds
-                Pattern cdnPattern = Pattern.compile("(?:https?:)?//[^\"'\\s<>]+(?:fgn\\.cdn|discretehosting|serverable|hwcdn\\.net|itch\\.zone)[^\"'\\s<>]*index\\.html[^\"'\\s<>]*", Pattern.CASE_INSENSITIVE);
+                // 4b. Search JavaScript variables for embedded game URLs
+                Pattern scriptVarPat = Pattern.compile("(?:game_url|gameUrl|embed_url|embedUrl|flash_file|game_src|swf_url|gamePath)\\s*[:=]\\s*[\"']([^\"']+)[\"']", Pattern.CASE_INSENSITIVE);
+                Matcher mScript = scriptVarPat.matcher(htmlStr);
+                while (mScript.find()) {
+                    String val = TwineParser.unescapeHtml(mScript.group(1)).trim();
+                    if (!val.isEmpty() && !val.startsWith("javascript:") && !isAdUrl(val)) {
+                        try {
+                            String full = sanitizeUrl(new URL(baseUrlObj, val).toString());
+                            String lower = full.toLowerCase(Locale.US);
+                            if (lower.contains("fgn.cdn") || lower.contains("serverable") ||
+                                lower.contains("discretehosting") || lower.contains("html5") ||
+                                lower.contains("index.html") || lower.contains("flashes")) {
+                                return new PortalResult(full, portalMeta.title, portalMeta.version, null);
+                            }
+                            candidates.add(full);
+                        } catch (Exception ignored) {}
+                    }
+                }
+
+                // 4c. Search regex inside page source for direct CDN embeds (with or without index.html)
+                Pattern cdnPattern = Pattern.compile("(?:https?:)?//[^\"'\\s<>]+(?:fgn\\.cdn|discretehosting|serverable|hwcdn\\.net|itch\\.zone|flashes)[^\"'\\s<>]*", Pattern.CASE_INSENSITIVE);
                 Matcher m2 = cdnPattern.matcher(htmlStr);
                 if (m2.find()) {
                     String rawMatch = TwineParser.unescapeHtml(m2.group(0));
-                    String resolvedCdn = new URL(baseUrlObj, rawMatch).toString();
+                    String resolvedCdn = sanitizeUrl(new URL(baseUrlObj, rawMatch).toString());
                     return new PortalResult(resolvedCdn, portalMeta.title, portalMeta.version, null);
                 }
 
-                // 4. Fallback to first non-ad candidate iframe if present
+                // 4d. Fallback to first non-ad candidate iframe if present
                 if (!candidates.isEmpty()) {
                     return new PortalResult(candidates.get(0), portalMeta.title, portalMeta.version, null);
                 }

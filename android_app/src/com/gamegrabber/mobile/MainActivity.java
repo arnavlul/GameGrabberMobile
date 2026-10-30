@@ -86,6 +86,7 @@ public class MainActivity extends Activity {
 
         mainExecutor = Executors.newSingleThreadExecutor();
 
+        PortalResolver.enableSSLBypass();
         ensureStoragePermissions();
         tryAutoLoadLinksFile();
     }
@@ -218,7 +219,8 @@ public class MainActivity extends Activity {
                         continue;
                     }
                 }
-                uniqueUrls.add(t);
+                String safe = PortalResolver.sanitizeUrl(t);
+                uniqueUrls.add(safe);
             }
         }
         return new ArrayList<>(uniqueUrls);

@@ -25,7 +25,7 @@ import time
 import html
 import argparse
 import threading
-from urllib.parse import urlparse, urljoin, unquote, quote
+from urllib.parse import urlparse, urljoin, unquote, quote, urlunparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 try:
@@ -104,11 +104,36 @@ def build_session(verify_ssl=False):
     session.mount("https://", adapter)
     return session
 
+def sanitize_url(url):
+    """Sanitizes hostnames containing underscores or invalid characters (RFC 1123 / IDNA)."""
+    if not url:
+        return ""
+    url = url.strip().strip("'\"")
+    if url.startswith("//"):
+        url = "https:" + url
+    parsed = urlparse(url)
+    host = parsed.netloc or ""
+    if not host:
+        return url
+
+    lower_host = host.lower()
+    new_host = host
+    if lower_host.endswith(".fgn.cdn.serverable.com") or lower_host.endswith(".serverable.com"):
+        new_host = "fgn.cdn.serverable.com"
+    elif lower_host.endswith(".discretehosting.com"):
+        new_host = "discretehosting.com"
+    elif "_" in host:
+        new_host = host.replace("_", "-")
+
+    if new_host != host:
+        return urlunparse((parsed.scheme, new_host, parsed.path, parsed.params, parsed.query, parsed.fragment))
+    return url
+
 def normalize_base_game_url(url):
     """Ensures directory URLs without a file extension end with '/' for proper urljoin resolution."""
     if not url:
         return ""
-    url = url.strip()
+    url = sanitize_url(url.strip())
     parts = url.split("?", 1)
     path_part = parts[0]
     query_part = ("?" + parts[1]) if len(parts) > 1 else ""
@@ -121,7 +146,7 @@ def normalize_base_game_url(url):
         last_seg = path.rsplit("/", 1)[-1]
         if "." not in last_seg:
             path_part += "/"
-    return path_part + query_part
+    return sanitize_url(path_part + query_part)
 
 def encode_url_path(rel_path):
     """Encodes relative asset path while keeping slashes and standard safe path characters intact."""
@@ -199,9 +224,25 @@ class PortalResolver:
                     return normalize_base_game_url(full_src), p_title, p_ver, None
                 candidates.append(full_src)
 
-            # 2. Search regex inside page source for CDN embeds
+            # 2. Search JavaScript variables for embedded game URLs
+            script_matches = re.findall(
+                r'(?:game_url|gameUrl|embed_url|embedUrl|flash_file|game_src|swf_url|gamePath)\s*[:=]\s*[\'"]([^\'"]+)[\'"]',
+                page_html, re.I
+            )
+            for sm in script_matches:
+                sm_clean = html.unescape(sm).strip()
+                if not sm_clean or sm_clean.startswith(("javascript:", "about:")) or any(ad in sm_clean.lower() for ad in AD_DOMAINS):
+                    continue
+                full_sm = urljoin(final_url, sm_clean)
+                lower_sm = full_sm.lower()
+                if any(kw in lower_sm for kw in ["fgn.cdn", "discretehosting", "flashes", "serverable", "html5", "index.html"]):
+                    print(f"  [+] Found game URL in script variable: {full_sm}")
+                    return normalize_base_game_url(full_sm), p_title, p_ver, None
+                candidates.append(full_sm)
+
+            # 3. Search regex inside page source for CDN embeds
             cdn_matches = re.findall(
-                r'(?:https?:)?//[^\s"\'<>]*(?:fgn\.cdn|discretehosting|serverable|hwcdn\.net|itch\.zone)[^\s"\'<>]*index\.html[^\s"\'<>]*',
+                r'(?:https?:)?//[^\s"\'<>]*(?:fgn\.cdn|discretehosting|serverable|hwcdn\.net|itch\.zone|flashes)[^\s"\'<>]*',
                 page_html, re.I
             )
             if cdn_matches:

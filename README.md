@@ -1,7 +1,7 @@
 # GameGrabberMobile 📱
 
 [![Latest Release](https://img.shields.io/github/v/release/arnavlul/GameGrabberMobile?label=Latest%20Release&color=38BDF8)](https://github.com/arnavlul/GameGrabberMobile/releases/latest)
-[![Download APK](https://img.shields.io/badge/Download-GameGrabber.apk%20(v1.3.0)-10B981?style=for-the-badge&logo=android&logoColor=white)](https://github.com/arnavlul/GameGrabberMobile/releases/latest/download/GameGrabber.apk)
+[![Download APK](https://img.shields.io/badge/Download-GameGrabber.apk%20(v1.4.0)-10B981?style=for-the-badge&logo=android&logoColor=white)](https://github.com/arnavlul/GameGrabberMobile/releases/latest/download/GameGrabber.apk)
 
 Universal offline web game downloader for Android (Native APK & Python CLI). Download and preserve HTML, Twine/SugarCube, Ren'Py Web, and browser games directly on mobile devices with batch URL processing, HTTP Range resuming, stream-truncation verification, and zero heavy browser dependencies.
 
@@ -10,7 +10,7 @@ Universal offline web game downloader for Android (Native APK & Python CLI). Dow
 ## 📦 Download & Installation
 
 ### Option 1: Native Android App (Recommended)
-👉 **[Download GameGrabber.apk (Latest v1.3.0)](https://github.com/arnavlul/GameGrabberMobile/releases/latest/download/GameGrabber.apk)**
+👉 **[Download GameGrabber.apk (Latest v1.4.0)](https://github.com/arnavlul/GameGrabberMobile/releases/latest/download/GameGrabber.apk)**
 1. Tap the download link on your phone.
 2. Open the downloaded `GameGrabber.apk` and tap **Install**.
 3. Open the app, grant file access when prompted, paste your links (or place a `links.txt` in `Downloads/`), and tap **START DOWNLOAD**.
