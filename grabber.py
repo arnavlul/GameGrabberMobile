@@ -1092,7 +1092,7 @@ Examples:
     parser.add_argument("urls", nargs="*", help="Optional URL(s) to download directly.")
     parser.add_argument("-l", "--links", "--file", dest="links_file", default="links.txt",
                         help="Path to line-separated links file (default: links.txt)")
-    parser.add_argument("-o", "--out", default=".", help="Base output directory (default: current directory)")
+    parser.add_argument("-o", "--out", default="downloads", help="Base output directory (default: downloads)")
     parser.add_argument("--threads", type=int, default=4, help="Number of download threads (default: 4 for mobile)")
     parser.add_argument("--limit", "--max-mb", dest="limit", type=float, default=None,
                         help="Max download limit in Megabytes (safe for mobile data plans)")
